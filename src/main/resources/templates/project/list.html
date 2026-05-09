@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Projets | TeamTrack</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<nav th:replace="~{fragments/navbar :: navbar}"></nav>
+<main class="container">
+
+    <div class="page-header">
+        <h2>Mes projets
+            <span class="badge" style="font-size:0.8rem; vertical-align:middle"
+                  th:text="${totalItems} + ' au total'">0</span>
+        </h2>
+        <a th:href="@{/projects/new}" class="btn btn-primary">+ Nouveau projet</a>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <div th:if="${error}"   class="alert alert-danger"  th:text="${error}"></div>
+
+    <div th:if="${projects.isEmpty()}" class="empty-state">
+        <p>Aucun projet pour le moment.</p>
+        <a th:href="@{/projects/new}" class="btn btn-primary">Créer un projet</a>
+    </div>
+
+    <div class="projects-grid">
+        <div class="project-card" th:each="project : ${projects}">
+            <div class="project-card-header">
+                <h4 th:text="${project.name}">Nom</h4>
+                <span class="badge"
+                      th:class="${project.overdue} ? 'badge badge-danger' : 'badge badge-success'"
+                      th:text="${project.overdue} ? 'En retard' : 'Actif'">Actif</span>
+            </div>
+            <p class="text-muted small" th:text="${project.description ?: 'Aucune description'}">Description</p>
+            <div class="progress-wrap">
+                <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:#64748b; margin-bottom:4px">
+                    <span>Progression</span>
+                    <span th:text="${project.progressPercentage} + '%'">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" th:style="'width:' + ${project.progressPercentage} + '%'"></div>
+                </div>
+            </div>
+            <div class="project-meta">
+                <span>📋 <span th:text="${project.tasks.size()}">0</span> tâches</span>
+                <span>👥 <span th:text="${project.members.size()}">0</span> membres</span>
+                <span th:if="${project.endDate != null}">📅 <span th:text="${project.endDate}">-</span></span>
+            </div>
+            <a th:href="@{/projects/{id}(id=${project.id})}" class="btn btn-outline btn-sm">
+                Ouvrir →
+            </a>
+        </div>
+    </div>
+
+    <!-- ====== PAGINATION ====== -->
+    <div th:if="${totalPages > 1}" class="pagination">
+        <!-- Bouton Précédent -->
+        <a th:if="${hasPrevious}"
+           th:href="@{/projects(page=${currentPage - 1})}"
+           class="btn btn-outline btn-sm">← Précédent</a>
+        <span th:unless="${hasPrevious}" class="btn btn-outline btn-sm disabled">← Précédent</span>
+
+        <!-- Numéros de pages -->
+        <span th:each="i : ${#numbers.sequence(0, totalPages - 1)}">
+            <a th:href="@{/projects(page=${i})}"
+               th:text="${i + 1}"
+               th:class="${i == currentPage} ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'">1</a>
+        </span>
+
+        <!-- Bouton Suivant -->
+        <a th:if="${hasNext}"
+           th:href="@{/projects(page=${currentPage + 1})}"
+           class="btn btn-outline btn-sm">Suivant →</a>
+        <span th:unless="${hasNext}" class="btn btn-outline btn-sm disabled">Suivant →</span>
+    </div>
+
+</main>
+</body>
+</html>

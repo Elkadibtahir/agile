@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Nouvelle tâche | TeamTrack</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<nav th:replace="~{fragments/navbar :: navbar}"></nav>
+<main class="container">
+    <div class="page-header">
+        <div>
+            <div class="breadcrumb">
+                <a th:href="@{/projects/{id}(id=${project.id})}" th:text="${project.name}">Projet</a> / Nouvelle tâche
+            </div>
+            <h2>Nouvelle tâche</h2>
+        </div>
+    </div>
+    <div class="card form-card">
+        <form th:action="@{/projects/{id}/tasks/new(id=${project.id})}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div class="form-group">
+                <label>Titre *</label>
+                <input type="text" name="title" class="form-control"
+                       placeholder="Ex: Implémenter le module de login" required/>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" class="form-control" rows="4"
+                          placeholder="Détaillez la tâche..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Priorité</label>
+                    <select name="priority" class="form-control">
+                        <option th:each="p : ${priorities}" th:value="${p}" th:text="${p}"
+                                th:selected="${p.name() == 'MEDIUM'}">P</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Échéance</label>
+                    <input type="date" name="dueDate" class="form-control"/>
+                </div>
+                <div class="form-group">
+                    <label>Assigner à</label>
+                    <select name="assigneeId" class="form-control">
+                        <option value="">Non assigné</option>
+                        <option th:each="m : ${project.members}"
+                                th:value="${m.user.id}"
+                                th:text="${m.user.fullName != null ? m.user.fullName : m.user.username}">User</option>
+                    </select>
+                </div>
+            </div>
+            <p class="text-muted small" style="margin-bottom:1rem">
+                💡 L'assigné recevra une notification par email automatiquement.
+            </p>
+            <div class="form-actions">
+                <a th:href="@{/projects/{id}(id=${project.id})}" class="btn btn-outline">Annuler</a>
+                <button type="submit" class="btn btn-primary">Créer la tâche</button>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>

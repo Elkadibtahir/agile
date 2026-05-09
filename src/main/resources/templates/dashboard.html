@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Dashboard | TeamTrack</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<nav th:replace="~{fragments/navbar :: navbar}"></nav>
+<main class="container">
+
+    <!-- En-tête -->
+    <div class="page-header">
+        <div>
+            <h2>Bonjour, <span th:text="${user.fullName != null ? user.fullName : user.username}">User</span> 👋</h2>
+            <p class="text-muted">Voici un résumé de vos projets</p>
+        </div>
+        <div style="display:flex; gap:1rem; align-items: center;">
+            <form th:action="@{/projects/join}" method="post" style="display:flex; gap:0.5rem;">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="text" name="code" class="form-control" placeholder="Code d'invitation" required style="width:150px; padding: 0.4rem;"/>
+                <button type="submit" class="btn btn-outline btn-sm">Rejoindre</button>
+            </form>
+            <a th:href="@{/projects/new}" class="btn btn-primary">+ Nouveau projet</a>
+        </div>
+    </div>
+
+    <!-- Messages flash -->
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <!-- Statistiques globales -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📁</div>
+            <div class="stat-value" th:text="${totalProjects}">0</div>
+            <div class="stat-label">Projets</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" th:text="${totalTaches}">0</div>
+            <div class="stat-label">Tâches totales</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value" th:text="${tachesTerminees}">0</div>
+            <div class="stat-label">Tâches terminées</div>
+        </div>
+        <div class="stat-card" th:classappend="${projetsEnRetard > 0} ? 'stat-danger'">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-value" th:text="${projetsEnRetard}">0</div>
+            <div class="stat-label">Projets en retard</div>
+        </div>
+    </div>
+
+    <!-- Liste des projets -->
+    <h3 class="section-title">Mes projets</h3>
+
+    <div th:if="${projects.isEmpty()}" class="empty-state">
+        <p>Aucun projet pour le moment.</p>
+        <a th:href="@{/projects/new}" class="btn btn-primary">Créer mon premier projet</a>
+    </div>
+
+    <div class="projects-grid">
+        <div class="project-card" th:each="project : ${projects}">
+            <div class="project-card-header">
+                <h4 th:text="${project.name}">Nom</h4>
+                <span class="badge"
+                      th:class="${project.overdue} ? 'badge badge-danger' : 'badge badge-success'"
+                      th:text="${project.overdue} ? 'En retard' : 'Actif'">Actif</span>
+            </div>
+
+            <p class="text-muted small" th:text="${project.description}">Description</p>
+
+            <!-- Barre de progression -->
+            <div class="progress-wrap">
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px">
+                    <span>Progression</span>
+                    <span th:text="${project.progressPercentage} + '%'">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" th:style="'width:' + ${project.progressPercentage} + '%'"></div>
+                </div>
+            </div>
+
+            <div class="project-meta">
+                <span>📅 <span th:text="${project.endDate != null ? project.endDate : 'Aucune échéance'}">-</span></span>
+                <span>👥 <span th:text="${project.members.size()}">0</span></span>
+                <span>📋 <span th:text="${project.tasks.size()}">0</span></span>
+            </div>
+
+            <a th:href="@{/projects/{id}(id=${project.id})}" class="btn btn-outline btn-sm">
+                Voir le Kanban →
+            </a>
+        </div>
+    </div>
+
+</main>
+</body>
+</html>

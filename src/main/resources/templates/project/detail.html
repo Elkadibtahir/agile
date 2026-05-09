@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${project.name} + ' | TeamTrack'">Projet</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+    <!-- SortableJS pour le Drag & Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- CSRF token dans le head pour que app.js puisse l'utiliser -->
+    <meta name="_csrf"        th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<nav th:replace="~{fragments/navbar :: navbar}"></nav>
+<main class="container">
+
+    <!-- En-tête -->
+    <div class="page-header">
+        <div>
+            <div class="breadcrumb">
+                <a th:href="@{/projects}">Projets</a> /
+                <span th:text="${project.name}">Projet</span>
+            </div>
+            <h2 th:text="${project.name}">Nom</h2>
+            <p class="text-muted" th:text="${project.description}">Description</p>
+            <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <span class="badge badge-outline" style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+                    🔑 Code d'invitation : <strong th:text="${project.invitationCode}">CODE</strong>
+                </span>
+                <span th:if="${project.invitationCodeCreatedAt != null}" 
+                      class="text-muted small" 
+                      th:with="expiry=${project.invitationCodeCreatedAt.plusHours(24)}">
+                    ⏳ Expire le : <span th:text="${#temporals.format(expiry, 'dd/MM/yyyy HH:mm')}">date</span>
+                </span>
+                <form th:if="${isOwner}" th:action="@{/projects/{id}/regenerate-code(id=${project.id})}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-xs btn-outline" title="Générer un nouveau code">🔄 Renouveler</button>
+                </form>
+            </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap">
+            <a th:if="${isOwner}" th:href="@{/projects/{id}/edit(id=${project.id})}"
+               class="btn btn-outline btn-sm">✏️ Modifier</a>
+            <form th:if="${isOwner}"
+                  th:action="@{/projects/{id}/delete(id=${project.id})}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-danger btn-sm"
+                        onclick="return confirm('Supprimer ce projet définitivement ?')">🗑️ Supprimer</button>
+            </form>
+        </div>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <div th:if="${error}"   class="alert alert-danger"  th:text="${error}"></div>
+
+    <!-- Alerte prédictive -->
+    <div th:if="${alert.atRisk}"  class="alert alert-danger"  th:text="${alert.message}"></div>
+    <div th:if="${alert.warning}" class="alert alert-warning" th:text="${alert.message}"></div>
+    <div th:if="${alert.onTrack}" class="alert alert-success" th:text="${alert.message}"></div>
+
+    <!-- Statistiques -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.progressPercentage} + '%'">0%</div>
+            <div class="stat-label">Progression</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.todoCount}">0</div>
+            <div class="stat-label">À faire</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.inProgressCount}">0</div>
+            <div class="stat-label">En cours</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.doneCount}">0</div>
+            <div class="stat-label">Terminées</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.velocity}">0</div>
+            <div class="stat-label">Tâches/semaine</div>
+        </div>
+    </div>
+
+    <!-- Barre de progression globale -->
+    <div class="progress-wrap" style="margin-bottom:2rem">
+        <div class="progress-bar" style="height:12px">
+            <div class="progress-fill" th:style="'width:' + ${stats.progressPercentage} + '%'"></div>
+        </div>
+    </div>
+
+    <!-- Tableau Kanban -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+        <h3>📋 Tableau Kanban</h3>
+        <a th:href="@{/projects/{id}/tasks/new(id=${project.id})}" class="btn btn-primary btn-sm">
+            + Nouvelle tâche
+        </a>
+    </div>
+
+    <div class="kanban-board">
+
+        <!-- À faire -->
+        <div class="kanban-col">
+            <div class="kanban-col-header col-todo">
+                📌 À faire
+                <span class="badge badge-todo" th:text="${todoTasks.size()}">0</span>
+            </div>
+            <div class="kanban-cards" id="col-TODO">
+                <div th:each="task : ${todoTasks}"
+                     class="kanban-card"
+                     th:classappend="${task.overdue} ? ' card-overdue'"
+                     th:data-task-id="${task.id}">
+                    <div style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap">
+                        <span th:class="'priority-badge priority-' + ${task.priority.name().toLowerCase()}"
+                              th:text="${task.priority}">M</span>
+                        <span th:if="${task.overdue}" class="badge badge-danger" style="font-size:0.7rem">Retard</span>
+                    </div>
+                    <p style="margin-bottom:6px; font-weight:500">
+                        <a th:href="@{/projects/{pid}/tasks/{tid}(pid=${project.id},tid=${task.id})}"
+                           th:text="${task.title}">Titre</a>
+                    </p>
+                    <div class="task-meta">
+                        <span th:if="${task.assignee != null}">👤 <span th:text="${task.assignee.fullName != null ? task.assignee.fullName : task.assignee.username}">User</span></span>
+                        <span th:if="${task.dueDate != null}">📅 <span th:text="${task.dueDate}">date</span></span>
+                    </div>
+                    <form th:action="@{/projects/{pid}/tasks/{tid}/status(pid=${project.id},tid=${task.id})}"
+                          method="post" style="margin-top:8px">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <input type="hidden" name="status" value="IN_PROGRESS"/>
+                        <button type="submit" class="btn btn-xs btn-outline">▶ En cours</button>
+                    </form>
+                </div>
+                <div th:if="${todoTasks.isEmpty()}" class="kanban-empty">Aucune tâche</div>
+            </div>
+        </div>
+
+        <!-- En cours -->
+        <div class="kanban-col">
+            <div class="kanban-col-header col-progress">
+                ⚙️ En cours
+                <span class="badge badge-progress" th:text="${inProgressTasks.size()}">0</span>
+            </div>
+            <div class="kanban-cards" id="col-IN_PROGRESS">
+                <div th:each="task : ${inProgressTasks}"
+                     class="kanban-card"
+                     th:classappend="${task.overdue} ? ' card-overdue'"
+                     th:data-task-id="${task.id}">
+                    <div style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap">
+                        <span th:class="'priority-badge priority-' + ${task.priority.name().toLowerCase()}"
+                              th:text="${task.priority}">M</span>
+                        <span th:if="${task.overdue}" class="badge badge-danger" style="font-size:0.7rem">Retard</span>
+                    </div>
+                    <p style="margin-bottom:6px; font-weight:500">
+                        <a th:href="@{/projects/{pid}/tasks/{tid}(pid=${project.id},tid=${task.id})}"
+                           th:text="${task.title}">Titre</a>
+                    </p>
+                    <div class="task-meta">
+                        <span th:if="${task.assignee != null}">👤 <span th:text="${task.assignee.fullName != null ? task.assignee.fullName : task.assignee.username}">User</span></span>
+                        <span th:if="${task.dueDate != null}">📅 <span th:text="${task.dueDate}">date</span></span>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-top:8px">
+                        <form th:action="@{/projects/{pid}/tasks/{tid}/status(pid=${project.id},tid=${task.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <input type="hidden" name="status" value="TODO"/>
+                            <button type="submit" class="btn btn-xs btn-outline">◀ Retour</button>
+                        </form>
+                        <form th:action="@{/projects/{pid}/tasks/{tid}/status(pid=${project.id},tid=${task.id})}" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <input type="hidden" name="status" value="DONE"/>
+                            <button type="submit" class="btn btn-xs btn-success">✓ Terminé</button>
+                        </form>
+                    </div>
+                </div>
+                <div th:if="${inProgressTasks.isEmpty()}" class="kanban-empty">Aucune tâche</div>
+            </div>
+        </div>
+
+        <!-- Terminé -->
+        <div class="kanban-col">
+            <div class="kanban-col-header col-done">
+                ✅ Terminé
+                <span class="badge badge-done" th:text="${doneTasks.size()}">0</span>
+            </div>
+            <div class="kanban-cards" id="col-DONE">
+                <div th:each="task : ${doneTasks}"
+                     class="kanban-card" style="opacity:0.75"
+                     th:data-task-id="${task.id}">
+                    <p style="margin-bottom:6px; font-weight:500; text-decoration:line-through; color:#64748b">
+                        <a th:href="@{/projects/{pid}/tasks/{tid}(pid=${project.id},tid=${task.id})}"
+                           th:text="${task.title}" style="color:inherit">Titre</a>
+                    </p>
+                    <div class="task-meta">
+                        <span th:if="${task.assignee != null}">👤 <span th:text="${task.assignee.fullName != null ? task.assignee.fullName : task.assignee.username}">User</span></span>
+                    </div>
+                    <form th:action="@{/projects/{pid}/tasks/{tid}/status(pid=${project.id},tid=${task.id})}" method="post" style="margin-top:8px">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <input type="hidden" name="status" value="IN_PROGRESS"/>
+                        <button type="submit" class="btn btn-xs btn-outline">↩ Rouvrir</button>
+                    </form>
+                </div>
+                <div th:if="${doneTasks.isEmpty()}" class="kanban-empty">Aucune tâche</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Membres et Documents -->
+    <hr style="margin:2rem 0"/>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+        
+        <!-- Section Membres -->
+        <div>
+            <h3 class="section-title">👥 Membres du projet</h3>
+            <div class="member-item" th:each="membre : ${project.members}">
+                <div style="display:flex; align-items:center; gap:0.75rem">
+                    <div class="member-avatar"
+                         th:text="${#strings.substring(membre.user.fullName != null ? membre.user.fullName : membre.user.username, 0, 1).toUpperCase()}">A</div>
+                    <div>
+                        <div style="font-weight:500" th:text="${membre.user.fullName != null ? membre.user.fullName : membre.user.username}">User</div>
+                        <div style="font-size:0.78rem; color:#64748b" th:text="${membre.role}">ROLE</div>
+                    </div>
+                </div>
+                <form th:if="${isOwner and membre.role != 'Chef de Projet'}"
+                      th:action="@{/projects/{pid}/membres/{uid}/remove(pid=${project.id},uid=${membre.user.id})}"
+                      method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-xs btn-danger"
+                            onclick="return confirm('Retirer ce membre ?')">✕</button>
+                </form>
+            </div>
+            
+            <div th:if="${isOwner}" class="card" style="margin-top: 1.5rem;">
+                <h4 style="margin-bottom:1rem">Assigner un rôle</h4>
+                <form th:action="@{/projects/{id}/membres/add(id=${project.id})}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div class="form-group">
+                        <label>Membre (ayant rejoint via code)</label>
+                        <select name="userId" class="form-control" required>
+                            <option value="">-- Choisir un membre --</option>
+                            <option th:each="u : ${eligibleUsers}" th:value="${u.id}"
+                                    th:text="${u.fullName != null ? u.fullName : u.username}">User</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rôle (libre)</label>
+                        <input type="text" name="role" class="form-control" placeholder="Ex: Développeur, Lead...">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Mettre à jour le rôle</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Section Documents -->
+        <div>
+            <h3 class="section-title">📁 Documents partagés</h3>
+            
+            <div th:if="${files.isEmpty()}" class="empty-state" style="padding: 1.5rem; border: 1px dashed var(--border); border-radius: 8px;">
+                <p>Aucun document pour le moment.</p>
+            </div>
+
+            <div class="member-item" th:each="file : ${files}">
+                <div style="display:flex; align-items:center; gap:0.75rem; overflow: hidden;">
+                    <div class="member-avatar" style="background: #94a3b8;">📄</div>
+                    <div style="overflow: hidden;">
+                        <div style="font-weight:500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" th:text="${file.fileName}">Fichier.pdf</div>
+                        <div style="font-size:0.75rem; color:#64748b">
+                            Par <span th:text="${file.uploader.username}">User</span> • 
+                            <span th:text="${#numbers.formatDecimal(file.fileSize / 1024.0, 1, 1)}">0</span> KB
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; gap: 0.4rem;">
+                    <a th:href="@{/projects/{pid}/files/download/{fid}(pid=${project.id},fid=${file.id})}" 
+                       class="btn btn-xs btn-outline">⬇️</a>
+                    <form th:if="${isOwner or file.uploader.username == user.username}" 
+                          th:action="@{/projects/{pid}/files/delete/{fid}(pid=${project.id},fid=${file.id})}" 
+                          method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button type="submit" class="btn btn-xs btn-danger" 
+                                onclick="return confirm('Supprimer ce fichier ?')">✕</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h4 style="margin-bottom:1rem">Mettre en ligne</h4>
+                <form th:action="@{/projects/{pid}/files/upload(pid=${project.id})}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div class="form-group">
+                        <input type="file" name="file" class="form-control" required/>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Envoyer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>
