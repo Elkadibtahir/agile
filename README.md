@@ -1,4 +1,4 @@
-# 🚀 TeamTrack v2 — Guide de démarrage complet
+# 🚀 TeamTrack  — Guide de démarrage complet
 
 ## Prérequis
 - Java 21
